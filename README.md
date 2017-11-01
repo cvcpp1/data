@@ -1,3 +1,17 @@
+# Running it (Python 3)
+
+## create a virtualenv
+
+## activate virtualenv
+
+## pip install -r requirements.txt
+
+## from create_patches import CreatePatches
+
+## See below for example code
+
+## data should be relative to the root of the repo
+
 # Using CreatePatches class
 ## Initialize with a dict of directory strings:
         img_fold: directory where  Shanghai images are stored
