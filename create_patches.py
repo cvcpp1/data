@@ -8,6 +8,22 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
     
 
+ST_DATA = "Shanghai Tech Dataset"
+UCF_DATA = "UCF CC 50 Dataset"
+
+ST_DATA_CONFIG = {
+    'dataset': ST_DATA,
+    'img_format': 'IMG_{}.jpg',
+    'gt_format': 'GT_IMG_{}.mat'
+}
+
+UCF_DATA_CONFIG = {
+    'dataset': UCF_DATA,
+    'img_format': '{}.jpg',
+    'gt_format': '{}_ann.mat'
+}
+
+
 class CreatePatches:
     ''' 
     Initialize with a dict of directory strings:
@@ -15,6 +31,7 @@ class CreatePatches:
         gt_fold: directory where Shanghai ground truths are stored
         final_img_fold: output image folder
         final_gt_fold: output ground truth folder
+        numfiles: optional if the get_numfiles won't work
 
     Call create_test_set() to get image and groundtruth patches
 
@@ -22,17 +39,20 @@ class CreatePatches:
 
     Example Usage:
 
-        test = CreatePatches(**{
+        inputs = {
             'img_fold': 'ST_DATA/A/test/images/',
             'gt_fold': 'ST_DATA/A/test/ground_truth/',
-            'final_img_fold': 'test_data2/images/',
-            'final_gt_fold': 'test_data2/gt/'
-            })
+            'final_img_fold': 'test_data1/images/',
+            'final_gt_fold': 'test_data1/gt/'
+
+        }
+        inputs.update(**ST_DATA_CONFIG)
+        test = CreatePatches(**inputs)
 
         test.create_test_set()
-
         test.plot_image_tiles(2)
         test.plot_dot_tiles(2)
+
 
     '''
 
@@ -43,9 +63,16 @@ class CreatePatches:
         self.final_img_fold = self.get_full_path(kwargs.pop('final_img_fold'), True)
         self.final_gt_fold = self.get_full_path(kwargs.pop('final_gt_fold'), True)
         self.img_prefix = 'IMG_'
-        self.gt_prefix = 'GT_IMG_'
-        self.numfiles = len([f for f in os.listdir(self.img_fold) if f.endswith('.jpg') and os.path.isfile(os.path.join(self.img_fold, f))])
+        self.img_format = kwargs.pop('img_format')
+        self.gt_format = kwargs.pop('gt_format')
+        self.dataset = kwargs.pop('dataset')
+        self.numfiles = self.get_numfiles(kwargs)
 
+    def get_numfiles(self, kwargs):
+        if "numfiles" in kwargs:
+            return kwargs.pop('numfiles')
+        else:
+            return len([f for f in os.listdir(self.img_fold) if f.endswith('.jpg') and os.path.isfile(os.path.join(self.img_fold, f))])
 
     def get_full_path(self, rel_path, makedir=False):
         directory = os.path.join(
@@ -63,7 +90,7 @@ class CreatePatches:
         return directory
 
     def get_image(self, i):
-        img_filename = '{}{}.jpg'.format(self.img_prefix, i + 1)
+        img_filename = self.img_format.format(i + 1)
         img_path = os.path.join(self.img_fold, img_filename)
         img = pli.open(img_path)
         img = np.asarray(img, dtype=np.uint8)
@@ -74,8 +101,8 @@ class CreatePatches:
         img = np.uint8(img)
         img = pli.fromarray(img).save(os.path.join(self.final_img_fold, name))
 
-    def get_ground_truth(self, i):
-        gt_filename = '{}{}.mat'.format(self.gt_prefix, i + 1)
+    def _get_st_data_ground_truth(self, i):
+        gt_filename = self.gt_format.format(i + 1)
         gt_path = os.path.join(self.gt_fold, gt_filename)
         gt = sio.loadmat(gt_path)
         image_info = gt['image_info']
@@ -84,7 +111,22 @@ class CreatePatches:
         for i in value['location']:
             assert len(i) == 1
             for j in i:
-                return j     
+                return j  
+
+    def _get_ucf_data_ground_truth(self, i):
+        gt_filename = self.gt_format.format(i + 1)
+        gt_path = os.path.join(self.gt_fold, gt_filename)
+        gt = sio.loadmat(gt_path)
+        ann_points = gt['annPoints']
+        return ann_points
+
+    def get_ground_truth(self, i):
+        if self.dataset == ST_DATA:
+            return self._get_st_data_ground_truth(i) 
+
+        elif self.dataset == UCF_DATA:
+            return self._get_ucf_data_ground_truth(i)
+
 
     def save_gt(self, gt, i, count):
          name = '{}{}_{}.mat'.format(self.img_prefix, i + 1, count)
@@ -114,11 +156,12 @@ class CreatePatches:
         return img
 
     def _create_test_set(self, i):
-        print(i + 1)
+        #print(i + 1)
         img = self.get_image(i)
         # moved this out of loop because 3rd dim indexing doesn't work in numpy unless already that shape
         img = self.check_dim(img)
         gt = self.get_ground_truth(i)
+        print (gt.shape)
 
         d_map_h = math.floor(math.floor(float(img.shape[0]) / 2.0) / 2.0)
         d_map_w = math.floor(math.floor(float(img.shape[1]) / 2.0) / 2.0)
@@ -187,6 +230,41 @@ class CreatePatches:
         plt.subplots_adjust(left=None, bottom=.18, right=None, top=None, wspace=.01, hspace=.001)
         plt.show()
         
+if __name__ == '__main__':
+    '''
+    inputs = {
+        'img_fold': 'ST_DATA/A/test/images/',
+        'gt_fold': 'ST_DATA/A/test/ground_truth/',
+        'final_img_fold': 'test_data1/images/',
+        'final_gt_fold': 'test_data1/gt/'
+
+    }
+    inputs.update(**ST_DATA_CONFIG)
+    print(inputs)
+    test = CreatePatches(**inputs)
+
+    test.create_test_set()
+    test.plot_image_tiles(2)
+    test.plot_dot_tiles(2)
+
+  
+    inputs2 = {
+        'img_fold': 'UCF_CC_50/',
+        'gt_fold': 'UCF_CC_50/',
+        'final_img_fold': 'test_data2/images/',
+        'final_gt_fold': 'test_data2/gt/',
+
+    }
+    inputs2.update(**UCF_DATA_CONFIG)
+
+    test2 = CreatePatches(**inputs2)
+    test2.create_test_set()
+
+    '''
+
+
+
+
 
 
 
