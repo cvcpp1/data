@@ -313,14 +313,14 @@ class CreatePatchesUCSD:
 
     def get_image(self, i, j):
         img_filename = self.img_format.format(i, f'{(j + 1):03}')
-        print (img_filename)
+        #print (img_filename)
         img_path = os.path.join(self.sub_img_fold, img_filename)
         img = pli.open(img_path)
         img = np.asarray(img, dtype=np.uint8)
         return img
 
-    def save_image(self, img, i, j, count):
-        name = '{}{}_{}_{}.jpg'.format(self.img_prefix, i, j + 1, count)
+    def save_image(self, img, count):
+        name = '{}{}_{}.jpg'.format(self.img_prefix, self.overall_count, count)
         img = np.uint8(img)
         img = pli.fromarray(img).save(os.path.join(self.final_img_fold, name))
 
@@ -331,8 +331,8 @@ class CreatePatchesUCSD:
                 return np.delete(y, 2, 1)
 
 
-    def save_gt(self, gt, i, j, count):
-         name = '{}{}_{}_{}.mat'.format(self.img_prefix, i, j + 1, count)
+    def save_gt(self, gt, count):
+         name = '{}{}_{}.mat'.format(self.img_prefix, self.overall_count, count)
          sio.savemat(os.path.join(self.final_gt_fold, name), {'final_gt': gt})
 
     def create_dotmaps(self, gt, img_h, img_w):
@@ -359,18 +359,19 @@ class CreatePatchesUCSD:
         return img
 
     def _create_test_set(self, i, j):
+        print (self.overall_count)
         #print(j + 1)
         img = self.get_image(i, j) # ten image folders, each with 200 images
         # moved this out of loop because 3rd dim indexing doesn't work in numpy unless already that shape
         img = self.check_dim(img)
         gt = self.get_ground_truth(j) # ten frame .mat files, each with 200 locations
-        print (gt.shape)
+        #print (gt.shape)
 
         d_map_h = math.floor(math.floor(float(img.shape[0]) / 2.0) / 2.0)
         d_map_w = math.floor(math.floor(float(img.shape[1]) / 2.0) / 2.0)
 
         d_map = self.create_dotmaps(gt / 4.0, d_map_h, d_map_w)
-        print(np.count_nonzero(d_map))
+        #print(np.count_nonzero(d_map))
 
         p_h = int(math.floor(float(img.shape[0]) / 3.0))
         p_w = int(math.floor(float(img.shape[1]) / 3.0))
@@ -389,11 +390,13 @@ class CreatePatchesUCSD:
                 final_gt = d_map[py2: py2 + d_map_ph, px2: px2 + d_map_pw]                 
                 px = px + p_w 
                 px2 = px2 + d_map_pw
-                self.save_image(final_image, i, j, count)
-                self.save_gt(final_gt, i, j, count)
+                self.save_image(final_image, count)
+                self.save_gt(final_gt, count)
                 count += 1
             py = py + p_h
             py2 = py2 + d_map_ph  
+
+        self.overall_count += 1
 
     
 
@@ -404,7 +407,7 @@ class CreatePatchesUCSD:
     def create_test_set(self):
         #p = mlt.Pool(mlt.cpu_count())
         #p.map(self._create_test_set, range(self.numfiles))
-
+        self.overall_count = 1
         for i in range(10):
             self.sub_img_fold = os.path.join(self.img_fold, 'vidf1_33_00{}.y/'.format(i))
             self.gts = self.get_gts(i)
@@ -412,7 +415,7 @@ class CreatePatchesUCSD:
             for j in range(self.numfiles):
                 self._create_test_set(i, j)
 
-    def plot_image_tiles(self, index1, index2):
+    def plot_image_tiles(self, index):
         fig = plt.figure()
         count = 1
         for i in range(3):
@@ -421,13 +424,13 @@ class CreatePatchesUCSD:
                 a.set_xticks([])
                 a.set_yticks([])
                 b = mpimg.imread(
-                    os.path.join(self.final_img_fold, 'IMG_{}_{}_{}.jpg'.format(index1, index2, count)))
+                    os.path.join(self.final_img_fold, 'IMG_{}_{}.jpg'.format(index, count)))
                 imgplot = plt.imshow(b)
                 count += 1
         plt.subplots_adjust(left=None, bottom=.18, right=None, top=None, wspace=.01, hspace=.001)
         plt.show()
 
-    def plot_dot_tiles(self, index1, index2):
+    def plot_dot_tiles(self, index):
         fig = plt.figure()
         count = 1
         for i in range(3):
@@ -436,7 +439,7 @@ class CreatePatchesUCSD:
                 a.set_xticks([])
                 a.set_yticks([])
                 d = sio.loadmat(
-                    os.path.join(self.final_gt_fold, 'IMG_{}_{}_{}.mat'.format(index1, index2, count)))
+                    os.path.join(self.final_gt_fold, 'IMG_{}_{}.mat'.format(index, count)))
                 dt = d['final_gt']
                 imgplot = plt.imshow(dt, cmap='gray')
                 count += 1
@@ -445,12 +448,12 @@ class CreatePatchesUCSD:
   
         
 if __name__ == '__main__':
-
+    
     inputs = {
-        'img_fold': 'ST_DATA/A/test/images/',
-        'gt_fold': 'ST_DATA/A/test/ground_truth/',
-        'final_img_fold': 'test_data1/images/',
-        'final_gt_fold': 'test_data1/gt/'
+        'img_fold': 'ST_DATA/B/test_data/images/',
+        'gt_fold': 'ST_DATA/B/test_data/ground_truth/',
+        'final_img_fold': 'st_data_B_test/images/',
+        'final_gt_fold': 'st_data_B_test/gt/'
 
     }
     inputs.update(**ST_DATA_CONFIG)
@@ -458,6 +461,7 @@ if __name__ == '__main__':
     test = CreatePatches(**inputs)
 
     test.create_test_set()
+    
     test.plot_image_tiles(2)
     test.plot_dot_tiles(2)
 
@@ -465,8 +469,8 @@ if __name__ == '__main__':
     inputs2 = {
         'img_fold': 'UCF_CC_50/',
         'gt_fold': 'UCF_CC_50/',
-        'final_img_fold': 'test_data2/images/',
-        'final_gt_fold': 'test_data2/gt/',
+        'final_img_fold': 'ucf_data/images/',
+        'final_gt_fold': 'ucf_data/gt/',
 
     }
     inputs2.update(**UCF_DATA_CONFIG)
@@ -476,17 +480,19 @@ if __name__ == '__main__':
     test2.plot_image_tiles(1)
     test2.plot_dot_tiles(1)
 
+    
     inputs3 = {
         'img_fold': 'ucsdpeds/vidf/',
         'gt_fold':  'gt_1_33/',
-        'final_img_fold': 'test_data3/images/',
-        'final_gt_fold': 'test_data3/gt/'
+        'final_img_fold': 'ucsd_data/images/',
+        'final_gt_fold': 'ucsd_data/gt/'
     }
     inputs3.update(**UCSD_DATA_CONFIG)
     test3 = CreatePatchesUCSD(**inputs3)
-    test3.create_test_set()
-    test3.plot_image_tiles(1,100)
-    test3.plot_dot_tiles(1, 100)
+    #test3.create_test_set()
+    test3.plot_image_tiles(100)
+    test3.plot_dot_tiles(100)
+    
 
     
 
