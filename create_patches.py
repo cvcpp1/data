@@ -203,7 +203,22 @@ class CreatePatches(BaseCreatePatches):
                 self.save_gt(final_gt, i, count)
                 count += 1
             py = py + p_h
-            py2 = py2 + d_map_ph  
+            py2 = py2 + d_map_ph 
+
+    def _create_test_set_whole(self, i):
+        #print(i + 1)
+        img = self.get_image(i)
+        # moved this out of loop because 3rd dim indexing doesn't work in numpy unless already that shape
+        img = self.check_dim(img)
+        gt = self.get_ground_truth(i)
+
+        d_map_h = math.floor(math.floor(float(img.shape[0]) / 2.0) / 2.0)
+        d_map_w = math.floor(math.floor(float(img.shape[1]) / 2.0) / 2.0)
+
+        d_map = self.create_dotmaps(gt / 4.0, d_map_h, d_map_w) 
+
+        self.save_image(img, i, 0)
+        self.save_gt(d_map, i, 0)
 
     def create_test_set(self):
         p = mlt.Pool(mlt.cpu_count())
@@ -211,6 +226,10 @@ class CreatePatches(BaseCreatePatches):
 
         #for i in range(self.numfiles):
             #self._create_test_set(i)
+
+    def create_test_set_whole(self):
+        p = mlt.Pool(mlt.cpu_count())
+        p.map(self._create_test_set_whole, range(self.numfiles))        
 
 
 class CreatePatchesUCSD(BaseCreatePatches):
@@ -272,6 +291,29 @@ class CreatePatchesUCSD(BaseCreatePatches):
 
         self.overall_count += 1
 
+    def _create_test_set_whole(self, i, j):
+        #print(j + 1)
+        img = self.get_image(i, j) # ten image folders, each with 200 images
+        # moved this out of loop because 3rd dim indexing doesn't work in numpy unless already that shape
+        img = self.check_dim(img)
+        gt = self.get_ground_truth(j) # ten frame .mat files, each with 200 locations
+        #print (gt.shape)
+
+        d_map_h = math.floor(math.floor(float(img.shape[0]) / 2.0) / 2.0)
+        d_map_w = math.floor(math.floor(float(img.shape[1]) / 2.0) / 2.0)
+
+        d_map = self.create_dotmaps(gt / 4.0, d_map_h, d_map_w)
+        #print(np.count_nonzero(d_map))
+
+        p_h = int(math.floor(float(img.shape[0]) / 3.0))
+        p_w = int(math.floor(float(img.shape[1]) / 3.0))
+        d_map_ph = int(math.floor(math.floor(p_h / 2.0) / 2.0))
+        d_map_pw = int(math.floor(math.floor(p_w / 2.0) / 2.0))
+
+        self.save_image(img, self.overall_count, 0)
+        self.save_gt(d_map, self.overall_count, 0)
+        self.overall_count += 1        
+
     def get_gts(self, i):
         gt = sio.loadmat(os.path.join(self.gt_fold, self.gt_format.format(i)))
         return gt['frame'][0]
@@ -287,8 +329,17 @@ class CreatePatchesUCSD(BaseCreatePatches):
             for j in range(self.numfiles):
                 self._create_test_set(i, j)
 
-if __name__ == '__main__':
+    def create_test_set_whole(self):
+        self.overall_count = 0
+        for i in range(10):
+            self.sub_img_fold = os.path.join(self.img_fold, 'vidf1_33_00{}.y/'.format(i))
+            self.gts = self.get_gts(i)
 
+            for j in range(self.numfiles):
+                self._create_test_set_whole(i, j)      
+
+if __name__ == '__main__':
+    '''
     inputs = {
         'img_fold': 'ST_DATA/A/test/images/',
         'gt_fold': 'ST_DATA/A/test/ground_truth/',
@@ -372,9 +423,35 @@ if __name__ == '__main__':
     test.plot_dot_tiles(40)
     
 
-    
+    inputs = {
+        'img_fold': 'ucsdpeds/vidf/',
+        'gt_fold':  'gt_1_33/',
+        'final_img_fold': 'ucsd_data/whole/images/',
+        'final_gt_fold': 'ucsd_data/whole/gt/'
+    }  
+
+    inputs.update(**UCSD_DATA_CONFIG)
+    test = CreatePatchesUCSD(**inputs)
+    test.create_test_set_whole()
+
+    d = sio.loadmat(os.path.join(inputs["final_gt_fold"], 'IMG_1000_0.mat'))
+    dt = d['final_gt']
+    imgplot = plt.imshow(dt, cmap='gray')
+    plt.show()
+    '''
 
 
+    inputs = {
+        'img_fold': 'UCF_CC_50/',
+        'gt_fold': 'UCF_CC_50/',
+        'final_img_fold': 'ucf_data/whole/images/',
+        'final_gt_fold': 'ucf_data/whole/gt/',
+
+    }
+    inputs.update(**UCF_DATA_CONFIG)
+
+    test = CreatePatches(**inputs)
+    test.create_test_set_whole()
 
 
 
